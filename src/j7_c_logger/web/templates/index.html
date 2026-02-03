@@ -7,67 +7,55 @@
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
     <style>
         :root {
-            --bg-color: #f9fafb;
-            --text-color: #111827;
-            --card-bg: #ffffff;
-            --border-color: #e5e7eb;
-            --accent: #6366f1;
-            --stat-label: #6b7280;
+            --bg-color: #f9fafb; --text-color: #111827; --card-bg: #ffffff;
+            --border-color: #e5e7eb; --accent: #6366f1; --stat-label: #6b7280;
         }
         @media (prefers-color-scheme: dark) {
             :root {
-                --bg-color: #0f172a;
-                --text-color: #f3f4f6;
-                --card-bg: #1e293b;
-                --border-color: #334155;
-                --accent: #818cf8;
-                --stat-label: #94a3b8;
+                --bg-color: #0f172a; --text-color: #f3f4f6; --card-bg: #1e293b;
+                --border-color: #334155; --accent: #818cf8; --stat-label: #94a3b8;
             }
         }
 
         body { margin: 0; padding: 0; background-color: var(--bg-color); color: var(--text-color); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; transition: background-color 0.3s; }
         .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
         
-        /* Header */
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid var(--border-color); }
         .header h1 { margin: 0; font-size: 1.5rem; }
-        .status-badge { padding: 5px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: bold; background: #9ca3af; color: white; transition: all 0.3s; display: flex; align-items: center; gap: 6px; }
-        .status-badge.connected { background: #10b981; }
-        .status-badge.scanning { background: #f59e0b; }
-        .status-badge.disconnected { background: #ef4444; }
-        .status-dot { width: 8px; height: 8px; background: white; border-radius: 50%; display: inline-block; }
-        .status-badge.scanning .status-dot { animation: blink 1s infinite; }
-        @keyframes blink { 50% { opacity: 0.2; } }
+        
+        /* Unified Status Badge */
+        .status-container { font-size: 0.9rem; font-weight: bold; display: flex; align-items: center; gap: 8px; padding: 6px 16px; border-radius: 20px; transition: all 0.3s; }
+        
+        /* States */
+        .status-container.live { background: rgba(16, 185, 129, 0.1); color: #10b981; border: 1px solid #10b981; }
+        .status-container.scanning { background: rgba(245, 158, 11, 0.1); color: #f59e0b; border: 1px solid #f59e0b; }
+        .status-container.disconnected { background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid #ef4444; }
+        
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; display: inline-block; }
+        .status-container.live .status-dot { animation: blink 1.5s infinite; }
+        .status-container.scanning .status-dot { animation: pulse 1s infinite; }
+        
+        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.2; } 100% { opacity: 1; } }
+        @keyframes pulse { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(1.5); opacity: 0; } }
 
-        /* Main Grid */
         .dashboard-grid { display: grid; grid-template-columns: 3fr 1fr; gap: 20px; margin-bottom: 20px; }
-        
-        /* Mobile: Stack vertically */
-        @media (max-width: 768px) {
-            .dashboard-grid { grid-template-columns: 1fr; }
-        }
+        @media (max-width: 1000px) { .dashboard-grid { grid-template-columns: 1fr; } }
 
-        /* Chart Area */
-        #chart-container { width: 100%; height: 400px; background: var(--card-bg); border-radius: 12px; padding: 15px; box-sizing: border-box; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        #chart-container { width: 100%; height: 500px; background: var(--card-bg); border-radius: 12px; padding: 15px; box-sizing: border-box; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
 
-        /* Side Panel (Current Values & Stats) */
         .side-panel { display: flex; flex-direction: column; gap: 15px; }
-        
         .card { background: var(--card-bg); padding: 15px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
         .card h3 { margin: 0 0 10px 0; font-size: 0.85rem; color: var(--accent); text-transform: uppercase; letter-spacing: 0.5px; }
-        
-        /* Live Values */
-        .live-value-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px dashed var(--border-color); }
-        .live-value-row:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+
+        .live-value-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; border-bottom: 1px dashed var(--border-color); }
         .live-value-label { font-size: 0.9rem; font-weight: 500; color: var(--stat-label); }
         .live-value { font-size: 1.4rem; font-weight: 700; font-feature-settings: "tnum"; }
         .unit { font-size: 0.6em; opacity: 0.7; margin-left: 2px; }
 
-        /* Stats Grid */
-        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        .stat-item { text-align: center; background: rgba(128,128,128,0.05); padding: 8px; border-radius: 8px; }
-        .stat-label { font-size: 0.7rem; color: var(--stat-label); margin-bottom: 2px; }
-        .stat-val { font-size: 0.95rem; font-weight: 600; }
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .stat-item { background: rgba(128,128,128,0.05); padding: 8px; border-radius: 6px; text-align: center; }
+        .stat-label { font-size: 0.65rem; color: var(--stat-label); margin-bottom: 2px; text-transform: uppercase; }
+        .stat-val { font-size: 0.9rem; font-weight: 600; }
 
     </style>
 </head>
@@ -75,67 +63,41 @@
     <div class="container">
         <div class="header">
             <h1>J7-C Monitor</h1>
-            <div id="status-badge" class="status-badge disconnected">
+            <!-- Simplified Status Badge -->
+            <div id="status-box" class="status-container disconnected">
                 <span class="status-dot"></span>
                 <span id="status-text">Disconnected</span>
             </div>
         </div>
 
         <div class="dashboard-grid">
-            <!-- Left: Chart -->
             <div id="chart-container"></div>
 
-            <!-- Right: Values & Stats -->
             <div class="side-panel">
-                <!-- Live Values Card -->
                 <div class="card">
                     <h3>Live Readings</h3>
-                    <div class="live-value-row">
-                        <span class="live-value-label" style="color: #fbbf24;">Voltage</span>
-                        <div class="live-value" id="val-v">--<span class="unit">V</span></div>
-                    </div>
-                    <div class="live-value-row">
-                        <span class="live-value-label" style="color: #22d3ee;">Current</span>
-                        <div class="live-value" id="val-a">--<span class="unit">A</span></div>
-                    </div>
-                    <div class="live-value-row">
-                        <span class="live-value-label" style="color: #ef4444;">Power</span>
-                        <div class="live-value" id="val-w">--<span class="unit">W</span></div>
-                    </div>
-                    <div class="live-value-row">
-                        <span class="live-value-label">Temp</span>
-                        <div class="live-value" id="val-t">--<span class="unit">°C</span></div>
-                    </div>
+                    <div class="live-value-row"><span class="live-value-label" style="color:#fbbf24;">Voltage</span><div class="live-value" id="val-v">--<span class="unit">V</span></div></div>
+                    <div class="live-value-row"><span class="live-value-label" style="color:#3b82f6;">Current</span><div class="live-value" id="val-a">--<span class="unit">A</span></div></div>
+                    <div class="live-value-row"><span class="live-value-label" style="color:#ef4444;">Power</span><div class="live-value" id="val-w">--<span class="unit">W</span></div></div>
+                    <div class="live-value-row"><span class="live-value-label" style="color:#f97316;">Temp</span><div class="live-value" id="val-t">--<span class="unit">°C</span></div></div>
                 </div>
 
-                <!-- Statistics Card -->
                 <div class="card">
-                    <h3>Session Stats</h3>
+                    <h3>Statistics</h3>
                     <div class="stats-grid">
-                        <div class="stat-item">
-                            <div class="stat-label">Max Power</div>
-                            <div class="stat-val" id="stat-max-w">-- W</div>
-                        </div>
-                        <div class="stat-item">
-                            <div class="stat-label">Avg Power</div>
-                            <div class="stat-val" id="stat-avg-w">-- W</div>
-                        </div>
-                        <div class="stat-item">
-                            <div class="stat-label">Max Voltage</div>
-                            <div class="stat-val" id="stat-max-v">-- V</div>
-                        </div>
-                        <div class="stat-item">
-                            <div class="stat-label">Max Current</div>
-                            <div class="stat-val" id="stat-max-a">-- A</div>
-                        </div>
-                        <div class="stat-item">
-                            <div class="stat-label">Total Time</div>
-                            <div class="stat-val" id="stat-time">00:00</div>
-                        </div>
-                        <div class="stat-item">
-                            <div class="stat-label">Data Points</div>
-                            <div class="stat-val" id="stat-count">0</div>
-                        </div>
+                        <div class="stat-item"><div class="stat-label">Max Voltage</div><div class="stat-val" id="stat-max-v">-- V</div></div>
+                        <div class="stat-item"><div class="stat-label">Avg Voltage</div><div class="stat-val" id="stat-avg-v">-- V</div></div>
+                        
+                        <div class="stat-item"><div class="stat-label">Max Current</div><div class="stat-val" id="stat-max-a">-- A</div></div>
+                        <div class="stat-item"><div class="stat-label">Avg Current</div><div class="stat-val" id="stat-avg-a">-- A</div></div>
+                        
+                        <div class="stat-item"><div class="stat-label">Max Power</div><div class="stat-val" id="stat-max-w">-- W</div></div>
+                        <div class="stat-item"><div class="stat-label">Avg Power</div><div class="stat-val" id="stat-avg-w">-- W</div></div>
+
+                        <div class="stat-item"><div class="stat-label">Max Temp</div><div class="stat-val" id="stat-max-t">-- °C</div></div>
+                        <div class="stat-item"><div class="stat-label">Avg Temp</div><div class="stat-val" id="stat-avg-t">-- °C</div></div>
+                        
+                        <div class="stat-item" style="grid-column: span 2; margin-top: 5px;"><div class="stat-label">Total Duration</div><div class="stat-val" id="stat-time">00:00:00</div></div>
                     </div>
                 </div>
             </div>
@@ -143,23 +105,18 @@
     </div>
 
     <script>
-        // Init Chart
         const chartDom = document.getElementById('chart-container');
-        const myChart = echarts.init(chartDom); // Theme auto-handled by media query listener logic below? No, echarts needs explicit theme or option update.
+        const myChart = echarts.init(chartDom);
         
-        let dataV = [];
-        let dataA = [];
-        let dataW = [];
-        let dataTime = [];
-        const maxDataPoints = 1800; // 30 mins history in RAM
+        let data = { v: [], a: [], w: [], t: [], time: [] };
+        const maxDataPoints = 3600; 
 
-        // Dynamic Color System
         function getThemeColors() {
             const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
             return {
                 text: isDark ? '#f3f4f6' : '#374151',
                 splitLine: isDark ? '#334155' : '#e5e7eb',
-                tooltipBg: isDark ? 'rgba(30, 41, 59, 0.9)' : 'rgba(255, 255, 255, 0.9)',
+                tooltipBg: isDark ? 'rgba(30, 41, 59, 0.95)' : 'rgba(255, 255, 255, 0.95)',
                 tooltipText: isDark ? '#fff' : '#000'
             };
         }
@@ -167,147 +124,133 @@
         function updateChartOption() {
             const colors = getThemeColors();
             myChart.setOption({
-                tooltip: { 
-                    trigger: 'axis', 
-                    axisPointer: { type: 'cross' },
-                    backgroundColor: colors.tooltipBg,
-                    textStyle: { color: colors.tooltipText },
-                    borderWidth: 0
-                },
-                legend: { 
-                    data: ['Voltage', 'Current', 'Power'], 
-                    textStyle: { color: colors.text }
-                },
+                backgroundColor: 'transparent',
+                tooltip: { trigger: 'axis', axisPointer: { type: 'cross' }, backgroundColor: colors.tooltipBg, textStyle: { color: colors.tooltipText } },
+                legend: { data: ['Voltage', 'Current', 'Power', 'Temp'], textStyle: { color: colors.text } },
                 grid: { left: '2%', right: '2%', bottom: '2%', top: '15%', containLabel: true },
-                xAxis: { 
-                    type: 'category', 
-                    boundaryGap: false, 
-                    data: dataTime,
-                    axisLabel: { color: colors.text }
-                },
+                xAxis: { type: 'category', boundaryGap: false, data: data.time, axisLabel: { color: colors.text } },
                 yAxis: [
-                    { 
-                        type: 'value', name: 'V / W', position: 'left', 
-                        splitLine: { lineStyle: { color: colors.splitLine } },
-                        axisLabel: { color: colors.text },
-                        nameTextStyle: { color: colors.text }
-                    },
-                    { 
-                        type: 'value', name: 'A', position: 'right', 
-                        splitLine: { show: false },
-                        axisLabel: { color: colors.text },
-                        nameTextStyle: { color: colors.text }
-                    }
+                    { type: 'value', name: 'V / W', position: 'left', splitLine: { lineStyle: { color: colors.splitLine } }, axisLabel: { color: colors.text } },
+                    { type: 'value', name: 'A', position: 'right', splitLine: { show: false }, axisLabel: { color: colors.text } },
+                    { type: 'value', name: '°C', position: 'right', offset: 40, splitLine: { show: false }, axisLabel: { color: colors.text } }
                 ],
                 series: [
-                    { name: 'Voltage', type: 'line', showSymbol: false, yAxisIndex: 0, data: dataV, itemStyle: { color: '#fbbf24' }, lineStyle: { width: 2 } },
-                    { name: 'Power', type: 'line', showSymbol: false, yAxisIndex: 0, data: dataW, itemStyle: { color: '#ef4444' }, lineStyle: { width: 1, type: 'dashed' }, areaStyle: { opacity: 0.1 } },
-                    { name: 'Current', type: 'line', showSymbol: false, yAxisIndex: 1, data: dataA, itemStyle: { color: '#22d3ee' }, lineStyle: { width: 2 } }
+                    { name: 'Voltage', type: 'line', showSymbol: false, yAxisIndex: 0, data: data.v, itemStyle: { color: '#fbbf24' } }, 
+                    { name: 'Current', type: 'line', showSymbol: false, yAxisIndex: 1, data: data.a, itemStyle: { color: '#3b82f6' } },
+                    { name: 'Power', type: 'line', showSymbol: false, yAxisIndex: 0, data: data.w, itemStyle: { color: '#ef4444' }, lineStyle: { type: 'dashed' }, areaStyle: { opacity: 0.1 } },
+                    { name: 'Temp', type: 'line', showSymbol: false, yAxisIndex: 2, data: data.t, itemStyle: { color: '#f97316' }, areaStyle: { opacity: 0.05 } } 
                 ]
             });
         }
-
-        // Initial render
         updateChartOption();
-
-        // Listen for Theme Changes
-        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-            updateChartOption();
-        });
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', updateChartOption);
         window.addEventListener('resize', myChart.resize);
 
         // Stats Logic
-        let maxV = 0, maxA = 0, maxW = 0, totalW = 0, count = 0;
+        let stats = { 
+            maxV: 0, sumV: 0, 
+            maxA: 0, sumA: 0, 
+            maxW: 0, sumW: 0, 
+            maxT: 0, sumT: 0,
+            count: 0 
+        };
 
-        function updateStats(v, a, w) {
-            count++;
-            maxV = Math.max(maxV, v);
-            maxA = Math.max(maxA, a);
-            maxW = Math.max(maxW, w);
-            totalW += w;
-            const avgW = totalW / count;
+        function updateStats(v, a, w, t) {
+            stats.count++;
+            stats.maxV = Math.max(stats.maxV, v); stats.sumV += v;
+            stats.maxA = Math.max(stats.maxA, a); stats.sumA += a;
+            stats.maxW = Math.max(stats.maxW, w); stats.sumW += w;
+            stats.maxT = Math.max(stats.maxT, t); stats.sumT += t;
 
-            document.getElementById('stat-max-v').innerText = maxV.toFixed(2) + ' V';
-            document.getElementById('stat-max-a').innerText = maxA.toFixed(2) + ' A';
-            document.getElementById('stat-max-w').innerText = maxW.toFixed(2) + ' W';
-            document.getElementById('stat-avg-w').innerText = avgW.toFixed(2) + ' W';
-            document.getElementById('stat-count').innerText = count;
+            document.getElementById('stat-max-v').innerText = stats.maxV.toFixed(2) + ' V';
+            document.getElementById('stat-avg-v').innerText = (stats.sumV / stats.count).toFixed(2) + ' V';
+            document.getElementById('stat-max-a').innerText = stats.maxA.toFixed(2) + ' A';
+            document.getElementById('stat-avg-a').innerText = (stats.sumA / stats.count).toFixed(2) + ' A';
+            document.getElementById('stat-max-w').innerText = stats.maxW.toFixed(2) + ' W';
+            document.getElementById('stat-avg-w').innerText = (stats.sumW / stats.count).toFixed(2) + ' W';
+            document.getElementById('stat-max-t').innerText = stats.maxT + ' °C';
+            document.getElementById('stat-avg-t').innerText = (stats.sumT / stats.count).toFixed(1) + ' °C';
             
-            // Simple time format (assuming 1 sec interval)
-            const minutes = Math.floor(count / 60);
-            const seconds = count % 60;
+            const hours = Math.floor(stats.count / 3600);
+            const minutes = Math.floor((stats.count % 3600) / 60);
+            const seconds = stats.count % 60;
             document.getElementById('stat-time').innerText = 
-                `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
         }
 
-        // WebSocket Logic
+        // Improved Status UI
+        function updateStatusUI(state, text) {
+            const box = document.getElementById('status-box');
+            const txt = document.getElementById('status-text');
+            
+            box.className = 'status-container'; // reset
+            txt.innerText = text;
+
+            if (state === 'live') {
+                box.classList.add('live');
+            } else if (state === 'scan') {
+                box.classList.add('scanning');
+            } else {
+                box.classList.add('disconnected');
+            }
+        }
+
+        // WebSocket
         const protocol = window.location.protocol === "https:" ? "wss" : "ws";
         const wsUrl = `${protocol}://${window.location.host}/ws`;
         let socket;
-        let lastPacketTime = 0;
-
-        function updateStatus(state, msg) {
-            const badge = document.getElementById('status-badge');
-            const text = document.getElementById('status-text');
-            badge.className = `status-badge ${state}`;
-            text.innerText = msg;
-        }
 
         function connect() {
             socket = new WebSocket(wsUrl);
-
-            socket.onopen = () => {
-                updateStatus('scanning', 'Scanning...');
-            };
-
+            socket.onopen = () => console.log("WS Connected");
+            
             socket.onmessage = (event) => {
-                const data = JSON.parse(event.data);
+                const msg = JSON.parse(event.data);
                 
-                updateStatus('connected', 'Live Logging');
-                lastPacketTime = Date.now();
+                if (msg.type === 'status') {
+                    const txt = msg.msg.toLowerCase();
+                    // Map backend status to UI state
+                    if (txt.includes('scanning') || txt.includes('connecting')) {
+                        updateStatusUI('scan', msg.msg);
+                    } else if (txt.includes('retrying') || txt.includes('error') || txt.includes('disconnect')) {
+                        updateStatusUI('disconnected', msg.msg);
+                    } else {
+                        updateStatusUI('scan', msg.msg);
+                    }
+                } else if (msg.type === 'data') {
+                    updateStatusUI('live', 'LIVE MONITORING');
+                    const d = msg.data;
+                    
+                    document.getElementById('val-v').innerHTML = `${d.voltage.toFixed(2)}<span class="unit">V</span>`;
+                    document.getElementById('val-a').innerHTML = `${d.current.toFixed(2)}<span class="unit">A</span>`;
+                    document.getElementById('val-w').innerHTML = `${d.power.toFixed(2)}<span class="unit">W</span>`;
+                    document.getElementById('val-t').innerHTML = `${d.temperature}<span class="unit">°C</span>`;
 
-                // Live Values
-                document.getElementById('val-v').innerHTML = `${data.voltage.toFixed(2)}<span class="unit">V</span>`;
-                document.getElementById('val-a').innerHTML = `${data.current.toFixed(2)}<span class="unit">A</span>`;
-                document.getElementById('val-w').innerHTML = `${data.power.toFixed(2)}<span class="unit">W</span>`;
-                document.getElementById('val-t').innerHTML = `${data.temperature}<span class="unit">°C</span>`;
+                    updateStats(d.voltage, d.current, d.power, d.temperature);
 
-                // Update Stats
-                updateStats(data.voltage, data.current, data.power);
+                    const now = new Date().toLocaleTimeString('en-US', { hour12: false });
+                    data.time.push(now);
+                    data.v.push(d.voltage); data.a.push(d.current); 
+                    data.w.push(d.power); data.t.push(d.temperature);
 
-                // Update Chart Arrays
-                const now = new Date().toLocaleTimeString('en-US', { hour12: false });
-                dataTime.push(now);
-                dataV.push(data.voltage);
-                dataA.push(data.current);
-                dataW.push(data.power);
+                    if (data.time.length > maxDataPoints) {
+                        data.time.shift(); data.v.shift(); data.a.shift(); data.w.shift(); data.t.shift();
+                    }
 
-                if (dataTime.length > maxDataPoints) {
-                    dataTime.shift(); dataV.shift(); dataA.shift(); dataW.shift();
+                    myChart.setOption({
+                        xAxis: { data: data.time },
+                        series: [ { data: data.v }, { data: data.a }, { data: data.w }, { data: data.t } ]
+                    });
                 }
-
-                // Efficient Chart Update
-                myChart.setOption({
-                    xAxis: { data: dataTime },
-                    series: [ { data: dataV }, { data: dataW }, { data: dataA } ]
-                });
             };
 
             socket.onclose = () => {
-                updateStatus('disconnected', 'Disconnected');
+                updateStatusUI('disconnected', 'Server Disconnected');
                 setTimeout(connect, 3000);
             };
         }
 
         connect();
-
-        // Watchdog
-        setInterval(() => {
-            if (socket && socket.readyState === WebSocket.OPEN && (Date.now() - lastPacketTime > 5000)) {
-                updateStatus('scanning', 'Device Lost?');
-            }
-        }, 2000);
-
     </script>
 </body>
 </html>

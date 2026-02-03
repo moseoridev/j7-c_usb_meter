@@ -11,10 +11,30 @@ from fastapi.responses import HTMLResponse
 from j7_c_logger.core.client import J7CBLEClient
 from j7_c_logger.core.protocol import Measurement
 
-# Global State for latest measurement
+# Global State
 latest_data: Measurement | None = None
+connection_status: str = "Initializing..."
 connected_clients: list[WebSocket] = []
 logger = logging.getLogger("uvicorn")
+
+async def broadcast_status(msg: str):
+    global connection_status
+    connection_status = msg
+    payload = json.dumps({"type": "status", "msg": msg})
+    # Broadcast to all clients
+    for client in connected_clients:
+        try:
+            await client.send_text(payload)
+        except:
+            pass
+
+async def broadcast_data(m: Measurement):
+    payload = json.dumps({"type": "data", "data": m.to_dict()})
+    for client in connected_clients:
+        try:
+            await client.send_text(payload)
+        except:
+            pass
 
 # Background BLE Task
 async def ble_worker(csv_path: str = None):
@@ -37,34 +57,37 @@ async def ble_worker(csv_path: str = None):
                 csv_writer.writeheader()
             csv_writer.writerow(m.to_dict())
             csv_file.flush()
+        
+        # Broadcast immediately
+        asyncio.create_task(broadcast_data(m))
 
     client = J7CBLEClient(on_measurement=on_measurement)
     
     while True:
         try:
+            await broadcast_status("Scanning...")
             device = await client.find_device()
+            
             if device:
                 logger.info(f"Connected to {device.name}")
+                await broadcast_status(f"Connecting to {device.name}...")
                 await client.run(device.address)
+                await broadcast_status("Disconnected. Retrying...")
             else:
-                logger.warning("Device not found. Retrying in 5s...")
+                await broadcast_status("Device not found. Retrying...")
                 await asyncio.sleep(5)
         except asyncio.CancelledError:
             break
         except Exception as e:
             logger.error(f"BLE Error: {e}")
+            await broadcast_status(f"Error: {str(e)}")
             await asyncio.sleep(5)
     
     if csv_file:
         csv_file.close()
 
-# FastAPI App Lifecycle
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Start BLE worker
-    # Note: We need a way to pass CSV path. For simplicity in this v1, 
-    # we default to 'web_session.csv' or get from env var if needed.
-    # In a real app, we might pass args differently.
     task = asyncio.create_task(ble_worker("web_log.csv"))
     yield
     task.cancel()
@@ -84,10 +107,14 @@ async def get():
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     connected_clients.append(websocket)
+    
+    # Send initial state
+    await websocket.send_text(json.dumps({"type": "status", "msg": connection_status}))
+    if latest_data:
+        await websocket.send_text(json.dumps({"type": "data", "data": latest_data.to_dict()}))
+        
     try:
         while True:
-            if latest_data:
-                await websocket.send_text(json.dumps(latest_data.to_dict()))
-            await asyncio.sleep(1)
+            await websocket.receive_text() # Keep connection open
     except WebSocketDisconnect:
         connected_clients.remove(websocket)
