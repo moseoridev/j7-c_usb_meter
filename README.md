@@ -1,79 +1,56 @@
-J7-C USB Tester Data Logger
----------------------------
+# J7-C USB Tester Logger
 
-Recently bought a J7-C USB tester  to measure charging voltage/current.
+A modern, headless data logger and web dashboard for the **J7-C / UC96** USB Tester via Bluetooth Low Energy (BLE).
 
-![J7-C USB Tester Front](j7c_front.jpg)
+Designed to be robust, lightweight, and easy to deploy on a Raspberry Pi or local machine.
 
-![J7-C USB Tester Back](j7c_back.jpg)
+## Features
 
-It also features Bluetooth interface to connect to Android apk or PC app for data logging.
+- **Headless Logging**: Runs in the background, auto-reconnects on signal loss.
+- **Web Dashboard**: Real-time charts (Voltage, Current, Power, Temp) using WebSockets.
+- **Data Persistence**: Restores chart history on page reload; survives browser disconnects.
+- **Zero Configuration**: Auto-discovers the device.
 
-But I'm a little squirmish about side-loading application from a dubious [mediafile folder](https://www.mediafire.com/folder/1c04afq923397/A3#v74ew1ux62x1t).
+## Installation
 
-Luckily, I've found some discussion regarding the Bluetooth protocol on Arduino forum [USB Digital Tester (BT) Protocol](https://forum.arduino.cc/t/usb-digital-tester-bt-protocol/943891)
+This project uses `uv` for dependency management.
 
-After a little experiment and reverse engineering, I've found that my device seems to output the data in a slightly different format. Once we open the Bluetooth serial port, it will send a 36-byte packet every 1 second. Example packet received:
+```bash
+# Clone the repository
+git clone https://github.com/yourname/j7-c-usb-meter.git
+cd j7-c-usb-meter
 
-    ff 55 01 3 00 01 f4 00 0 34 00 0f fa 00 0 8 52 00 09 00 0a 00 20 00 03 2c 18 3c 0c 80 00 00 03 20 00 9e
+# Install dependencies
+uv sync
+```
 
-Comparing the the info from the Arduino forum, it seems the packet format is still mostly similar but slightly offset as below:
+## Usage
 
-| **Offset** | **Data Byte** | **Multibyte hex** | **Value** | **Data Type**             |
-| ---------- | ------------- | ----------------- | --------- | ------------------------- |
-| 0          | ff            |                   |           |                           |
-| 1          | 55            |                   |           |                           |
-| 2          | 01            |                   |           |                           |
-| 3          | 03            |                   |           |                           |
-| 4          | 00            | 0001f4            | 5.00      | voltage                   |
-| 5          | 01            |
-| 6          | f4            |
-| 7          | 00            | 000034            | 0.52      | current                   |
-| 8          | 00            |
-| 9          | 34            |
-| 10         | 00            | 000ffa            | 4090      | mAh                       |
-| 11         | 0f            |
-| 12         | fa            |
-| 13         | 00            | 00000852          | 21.30     | energy, Wh                |
-| 14         | 00            |
-| 15         | 08            |
-| 16         | 52            |
-| 17         | 00            | 0009              | 0.09      | D+ voltage                |
-| 18         | 09            |
-| 19         | 00            | 000a              | 0.1       | D- voltage                |
-| 20         | 0a            |
-| 21         | 00            | 0020              | 32        | CPU temperature (celcius) |
-| 22         | 20            |
-| 23         | 00            | 00                | 03:44:44  | duration day:hh:mm:ss     |
-| 24         | 03            | 03                |
-| 25         | 2c            | 2c                |
-| 26         | 18            | 18                |
-| 27         | 3c            |                   |           |                           |
-| 28         | 0c            |                   |           |                           |
-| 29         | 80            |                   |           |                           |
-| 30         | 00            |                   |           |                           |
-| 31         | 00            |                   |           |                           |
-| 32         | 03            |                   |           |                           |
-| 33         | 20            |                   |           |                           |
-| 34         | 00            |                   |           |                           |
-| 35         | 9e            |                   |           |                           |
+### 1. Web Dashboard (Recommended)
+Starts the background logger and a local web server.
 
+```bash
+uv run j7-c-usb-tester web
+```
+- Open **http://localhost:8000** in your browser.
+- Data is auto-saved to `logs/j7c_YYYYMMDD_HHMMSS.csv`.
+- Use `--csv <filename>` to specify a custom log file.
 
-It does not seems to provide power value but we can easily calculate power P = V x I
+### 2. CLI Logger (Headless)
+Runs only the logger in the terminal. Useful for minimal environments.
 
-So, I've written a simple python script to read the data and save it as CSV file so that it can be processed by other apps such as Excel or LibreOffice.
+```bash
+uv run j7-c-usb-tester run
+```
+- Use `--quiet` to suppress output (useful for systemd services).
+- Use `--verbose` for raw data inspection.
 
-Here's the steps:
+## Project Structure
 
-1. Connect to the bluetooth serial port.
-2. Run `python3 j7-c_usb_tester.py --csv out.csv /dev/rfcomm0` for Linux or replace `/dev/rfcomm0` with COM port on Windows.
-3. Press Ctrl-C to exit after you are done logging the data.
+- `src/j7_c_logger/core/`: Protocol parsing and BLE client logic.
+- `src/j7_c_logger/web/`: FastAPI backend and HTML frontend.
+- `PROTOCOL.md`: Detailed documentation of the byte-level packet format.
 
+## License
 
-## Example data
-
-I've recorded the measurements when charging my OnePlus phone with the 65W SuperVOOC charger in [supervooc_2022-09-03_131744.csv](supervooc_2022-09-03_131744.csv).
-
-Using LibreOffice to open the CSV file, I've plotted the charging curve as below:
-
-![SuperVOOC charging curve](supervooc-charging-curve.png)
+MIT
