@@ -3,11 +3,11 @@ import asyncio
 import csv
 import uvicorn
 import logging
+import os
 from rich.console import Console
 from .core.client import J7CBLEClient
 
-# Configure logging to show up in Rich console nicely if needed, 
-# but for CLI mode we control output manually.
+# Configure logging
 logging.basicConfig(level=logging.ERROR)
 
 app = typer.Typer(help="J7-C USB Tester Logger & Web Dashboard")
@@ -46,13 +46,11 @@ def run(
                 status_msg = f"OK"
                 if m.voltage < m.lvp or m.current > m.ocp:
                     status_msg = "PROTECTION?"
-                # Overwrite line implementation could be added, but simple scroll is safer for logging
                 print(f"{m.timestamp.split('T')[1][:8]} | {m.voltage:5.2f} V | {m.current:5.2f} A | {m.power:5.2f} W | {m.temperature}C | {status_msg}")
 
     async def main_async():
         client = J7CBLEClient(on_measurement=on_measurement)
         
-        # Infinite Retry Loop
         while True:
             device = None
             if not quiet:
@@ -93,6 +91,7 @@ def run(
 
 @app.command()
 def web(
+    csv_file: str = typer.Option("web_log.csv", "--csv", help="Path to save CSV data"),
     port: int = typer.Option(8000, help="Web server port"),
     host: str = typer.Option("0.0.0.0", help="Web server host")
 ):
@@ -100,7 +99,11 @@ def web(
     Start Web Dashboard (and background logging).
     """
     console.print(f"[green]Starting Web Dashboard at http://{host}:{port}[/green]")
+    console.print(f"[dim]Logging to: {csv_file}[/dim]")
     console.print("[dim]Background logging active. Press Ctrl+C to stop server.[/dim]")
+    
+    # Pass CSV path via environment variable to the worker
+    os.environ["J7C_CSV_PATH"] = csv_file
     
     # Run Uvicorn Programmatically
     uvicorn.run("j7_c_logger.web.server:app", host=host, port=port, reload=False)

@@ -6,73 +6,45 @@
     <title>J7-C USB Tester</title>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
     <style>
-        :root {
-            --bg-color: #f9fafb; --text-color: #111827; --card-bg: #ffffff;
-            --border-color: #e5e7eb; --accent: #6366f1; --stat-label: #6b7280;
-        }
-        @media (prefers-color-scheme: dark) {
-            :root {
-                --bg-color: #0f172a; --text-color: #f3f4f6; --card-bg: #1e293b;
-                --border-color: #334155; --accent: #818cf8; --stat-label: #94a3b8;
-            }
-        }
-
-        body { margin: 0; padding: 0; background-color: var(--bg-color); color: var(--text-color); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; transition: background-color 0.3s; }
+        :root { --bg-color: #f9fafb; --text-color: #111827; --card-bg: #ffffff; --border-color: #e5e7eb; --accent: #6366f1; --stat-label: #6b7280; }
+        @media (prefers-color-scheme: dark) { :root { --bg-color: #0f172a; --text-color: #f3f4f6; --card-bg: #1e293b; --border-color: #334155; --accent: #818cf8; --stat-label: #94a3b8; } }
+        body { margin: 0; padding: 0; background-color: var(--bg-color); color: var(--text-color); font-family: sans-serif; transition: background 0.3s; }
         .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
-        
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid var(--border-color); }
         .header h1 { margin: 0; font-size: 1.5rem; }
-        
-        /* Unified Status Badge */
         .status-container { font-size: 0.9rem; font-weight: bold; display: flex; align-items: center; gap: 8px; padding: 6px 16px; border-radius: 20px; transition: all 0.3s; }
-        
-        /* States */
         .status-container.live { background: rgba(16, 185, 129, 0.1); color: #10b981; border: 1px solid #10b981; }
         .status-container.scanning { background: rgba(245, 158, 11, 0.1); color: #f59e0b; border: 1px solid #f59e0b; }
         .status-container.disconnected { background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid #ef4444; }
-        
         .status-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; display: inline-block; }
         .status-container.live .status-dot { animation: blink 1.5s infinite; }
         .status-container.scanning .status-dot { animation: pulse 1s infinite; }
-        
         @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.2; } 100% { opacity: 1; } }
         @keyframes pulse { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(1.5); opacity: 0; } }
-
-        .dashboard-grid { display: grid; grid-template-columns: 3fr 1fr; gap: 20px; margin-bottom: 20px; }
+        .dashboard-grid { display: grid; grid-template-columns: 3fr 1fr; gap: 20px; }
         @media (max-width: 1000px) { .dashboard-grid { grid-template-columns: 1fr; } }
-
         #chart-container { width: 100%; height: 500px; background: var(--card-bg); border-radius: 12px; padding: 15px; box-sizing: border-box; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-
         .side-panel { display: flex; flex-direction: column; gap: 15px; }
         .card { background: var(--card-bg); padding: 15px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
         .card h3 { margin: 0 0 10px 0; font-size: 0.85rem; color: var(--accent); text-transform: uppercase; letter-spacing: 0.5px; }
-
         .live-value-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; border-bottom: 1px dashed var(--border-color); }
         .live-value-label { font-size: 0.9rem; font-weight: 500; color: var(--stat-label); }
         .live-value { font-size: 1.4rem; font-weight: 700; font-feature-settings: "tnum"; }
         .unit { font-size: 0.6em; opacity: 0.7; margin-left: 2px; }
-
         .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
         .stat-item { background: rgba(128,128,128,0.05); padding: 8px; border-radius: 6px; text-align: center; }
         .stat-label { font-size: 0.65rem; color: var(--stat-label); margin-bottom: 2px; text-transform: uppercase; }
         .stat-val { font-size: 0.9rem; font-weight: 600; }
-
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
             <h1>J7-C Monitor</h1>
-            <!-- Simplified Status Badge -->
-            <div id="status-box" class="status-container disconnected">
-                <span class="status-dot"></span>
-                <span id="status-text">Disconnected</span>
-            </div>
+            <div id="status-box" class="status-container disconnected"><span class="status-dot"></span><span id="status-text">Disconnected</span></div>
         </div>
-
         <div class="dashboard-grid">
             <div id="chart-container"></div>
-
             <div class="side-panel">
                 <div class="card">
                     <h3>Live Readings</h3>
@@ -81,36 +53,28 @@
                     <div class="live-value-row"><span class="live-value-label" style="color:#ef4444;">Power</span><div class="live-value" id="val-w">--<span class="unit">W</span></div></div>
                     <div class="live-value-row"><span class="live-value-label" style="color:#f97316;">Temp</span><div class="live-value" id="val-t">--<span class="unit">°C</span></div></div>
                 </div>
-
                 <div class="card">
                     <h3>Statistics</h3>
                     <div class="stats-grid">
                         <div class="stat-item"><div class="stat-label">Max Voltage</div><div class="stat-val" id="stat-max-v">-- V</div></div>
                         <div class="stat-item"><div class="stat-label">Avg Voltage</div><div class="stat-val" id="stat-avg-v">-- V</div></div>
-                        
                         <div class="stat-item"><div class="stat-label">Max Current</div><div class="stat-val" id="stat-max-a">-- A</div></div>
                         <div class="stat-item"><div class="stat-label">Avg Current</div><div class="stat-val" id="stat-avg-a">-- A</div></div>
-                        
                         <div class="stat-item"><div class="stat-label">Max Power</div><div class="stat-val" id="stat-max-w">-- W</div></div>
                         <div class="stat-item"><div class="stat-label">Avg Power</div><div class="stat-val" id="stat-avg-w">-- W</div></div>
-
                         <div class="stat-item"><div class="stat-label">Max Temp</div><div class="stat-val" id="stat-max-t">-- °C</div></div>
                         <div class="stat-item"><div class="stat-label">Avg Temp</div><div class="stat-val" id="stat-avg-t">-- °C</div></div>
-                        
                         <div class="stat-item" style="grid-column: span 2; margin-top: 5px;"><div class="stat-label">Total Duration</div><div class="stat-val" id="stat-time">00:00:00</div></div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-
     <script>
         const chartDom = document.getElementById('chart-container');
         const myChart = echarts.init(chartDom);
-        
         let data = { v: [], a: [], w: [], t: [], time: [] };
         const maxDataPoints = 3600; 
-
         function getThemeColors() {
             const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
             return {
@@ -120,7 +84,6 @@
                 tooltipText: isDark ? '#fff' : '#000'
             };
         }
-
         function updateChartOption() {
             const colors = getThemeColors();
             myChart.setOption({
@@ -146,22 +109,10 @@
         window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', updateChartOption);
         window.addEventListener('resize', myChart.resize);
 
-        // Stats Logic
-        let stats = { 
-            maxV: 0, sumV: 0, 
-            maxA: 0, sumA: 0, 
-            maxW: 0, sumW: 0, 
-            maxT: 0, sumT: 0,
-            count: 0 
-        };
+        let stats = { maxV: 0, sumV: 0, maxA: 0, sumA: 0, maxW: 0, sumW: 0, maxT: 0, sumT: 0, count: 0 };
 
-        function updateStats(v, a, w, t) {
-            stats.count++;
-            stats.maxV = Math.max(stats.maxV, v); stats.sumV += v;
-            stats.maxA = Math.max(stats.maxA, a); stats.sumA += a;
-            stats.maxW = Math.max(stats.maxW, w); stats.sumW += w;
-            stats.maxT = Math.max(stats.maxT, t); stats.sumT += t;
-
+        function updateStatsUI() {
+            if (stats.count === 0) return;
             document.getElementById('stat-max-v').innerText = stats.maxV.toFixed(2) + ' V';
             document.getElementById('stat-avg-v').innerText = (stats.sumV / stats.count).toFixed(2) + ' V';
             document.getElementById('stat-max-a').innerText = stats.maxA.toFixed(2) + ' A';
@@ -170,32 +121,42 @@
             document.getElementById('stat-avg-w').innerText = (stats.sumW / stats.count).toFixed(2) + ' W';
             document.getElementById('stat-max-t').innerText = stats.maxT + ' °C';
             document.getElementById('stat-avg-t').innerText = (stats.sumT / stats.count).toFixed(1) + ' °C';
-            
             const hours = Math.floor(stats.count / 3600);
             const minutes = Math.floor((stats.count % 3600) / 60);
             const seconds = stats.count % 60;
-            document.getElementById('stat-time').innerText = 
-                `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            document.getElementById('stat-time').innerText = `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
         }
 
-        // Improved Status UI
-        function updateStatusUI(state, text) {
-            const box = document.getElementById('status-box');
-            const txt = document.getElementById('status-text');
+        function processDataPoint(d) {
+            stats.count++;
+            stats.maxV = Math.max(stats.maxV, d.voltage); stats.sumV += d.voltage;
+            stats.maxA = Math.max(stats.maxA, d.current); stats.sumA += d.current;
+            stats.maxW = Math.max(stats.maxW, d.power); stats.sumW += d.power;
+            stats.maxT = Math.max(stats.maxT, d.temperature); stats.sumT += d.temperature;
             
-            box.className = 'status-container'; // reset
-            txt.innerText = text;
+            // Assuming timestamp comes as ISO string, convert to local time
+            const date = new Date(d.timestamp);
+            const timeStr = date.toLocaleTimeString('en-US', { hour12: false });
+            
+            data.time.push(timeStr);
+            data.v.push(d.voltage); data.a.push(d.current); 
+            data.w.push(d.power); data.t.push(d.temperature);
 
-            if (state === 'live') {
-                box.classList.add('live');
-            } else if (state === 'scan') {
-                box.classList.add('scanning');
-            } else {
-                box.classList.add('disconnected');
+            if (data.time.length > maxDataPoints) {
+                data.time.shift(); data.v.shift(); data.a.shift(); data.w.shift(); data.t.shift();
             }
         }
 
-        // WebSocket
+        function updateStatusUI(state, text) {
+            const box = document.getElementById('status-box');
+            const txt = document.getElementById('status-text');
+            box.className = 'status-container'; 
+            txt.innerText = text;
+            if (state === 'live') box.classList.add('live');
+            else if (state === 'scan') box.classList.add('scanning');
+            else box.classList.add('disconnected');
+        }
+
         const protocol = window.location.protocol === "https:" ? "wss" : "ws";
         const wsUrl = `${protocol}://${window.location.host}/ws`;
         let socket;
@@ -203,53 +164,51 @@
         function connect() {
             socket = new WebSocket(wsUrl);
             socket.onopen = () => console.log("WS Connected");
-            
             socket.onmessage = (event) => {
                 const msg = JSON.parse(event.data);
                 
-                if (msg.type === 'status') {
-                    const txt = msg.msg.toLowerCase();
-                    // Map backend status to UI state
-                    if (txt.includes('scanning') || txt.includes('connecting')) {
-                        updateStatusUI('scan', msg.msg);
-                    } else if (txt.includes('retrying') || txt.includes('error') || txt.includes('disconnect')) {
-                        updateStatusUI('disconnected', msg.msg);
-                    } else {
-                        updateStatusUI('scan', msg.msg);
-                    }
+                if (msg.type === 'history') {
+                    // Bulk load history
+                    const history = msg.data;
+                    console.log("Restoring history:", history.length);
+                    // Reset data first? Maybe better to keep appending if connection flap
+                    // But usually history implies "All relevant data".
+                    // Let's clear and rebuild to be safe
+                    data = { v: [], a: [], w: [], t: [], time: [] };
+                    stats = { maxV: 0, sumV: 0, maxA: 0, sumA: 0, maxW: 0, sumW: 0, maxT: 0, sumT: 0, count: 0 };
+                    
+                    history.forEach(processDataPoint);
+                    updateStatsUI();
+                    
+                    // Update chart only once
+                    myChart.setOption({ xAxis: { data: data.time }, series: [ { data: data.v }, { data: data.a }, { data: data.w }, { data: data.t } ] });
+
                 } else if (msg.type === 'data') {
                     updateStatusUI('live', 'LIVE MONITORING');
                     const d = msg.data;
                     
+                    // Update Live Cards
                     document.getElementById('val-v').innerHTML = `${d.voltage.toFixed(2)}<span class="unit">V</span>`;
                     document.getElementById('val-a').innerHTML = `${d.current.toFixed(2)}<span class="unit">A</span>`;
                     document.getElementById('val-w').innerHTML = `${d.power.toFixed(2)}<span class="unit">W</span>`;
                     document.getElementById('val-t').innerHTML = `${d.temperature}<span class="unit">°C</span>`;
 
-                    updateStats(d.voltage, d.current, d.power, d.temperature);
-
-                    const now = new Date().toLocaleTimeString('en-US', { hour12: false });
-                    data.time.push(now);
-                    data.v.push(d.voltage); data.a.push(d.current); 
-                    data.w.push(d.power); data.t.push(d.temperature);
-
-                    if (data.time.length > maxDataPoints) {
-                        data.time.shift(); data.v.shift(); data.a.shift(); data.w.shift(); data.t.shift();
-                    }
+                    processDataPoint(d);
+                    updateStatsUI();
 
                     myChart.setOption({
                         xAxis: { data: data.time },
                         series: [ { data: data.v }, { data: data.a }, { data: data.w }, { data: data.t } ]
                     });
+                } else if (msg.type === 'status') {
+                    const txt = msg.msg.toLowerCase();
+                    if (txt.includes('scanning') || txt.includes('connecting')) updateStatusUI('scan', msg.msg);
+                    else if (txt.includes('retrying') || txt.includes('error') || txt.includes('disconnect')) updateStatusUI('disconnected', msg.msg);
+                    else updateStatusUI('scan', msg.msg);
                 }
             };
-
-            socket.onclose = () => {
-                updateStatusUI('disconnected', 'Server Disconnected');
-                setTimeout(connect, 3000);
-            };
+            socket.onclose = () => { updateStatusUI('disconnected', 'Server Disconnected'); setTimeout(connect, 3000); };
         }
-
         connect();
     </script>
 </body>
