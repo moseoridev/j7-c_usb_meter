@@ -1,12 +1,11 @@
 import typer
 import asyncio
 import csv
+import uvicorn
 from rich.console import Console
-from rich.table import Table
-from rich.live import Live
 from .core.client import J7CBLEClient
 
-app = typer.Typer(help="J7-C USB Tester Headless Logger")
+app = typer.Typer(help="J7-C USB Tester Logger & Web Dashboard")
 console = Console()
 
 @app.command()
@@ -16,31 +15,17 @@ def run(
     verbose: bool = typer.Option(False, "--verbose", help="Show detailed log output")
 ):
     """
-    Start data collection.
-    
-    Default behavior: Connects to device and prints measurements to stdout in a simple table.
-    Use --quiet for headless/background execution.
+    Start data collection (CLI Mode).
     """
     csv_handler = None
     csv_writer = None
 
     if csv_file:
-        f = open(csv_file, 'w', newline='')
+        f = open(csv_file, "w", newline="")
         csv_handler = f
-
-    # Prepare a simple live table for standard output
-    table = Table(box=None, show_header=True, header_style="bold cyan")
-    table.add_column("Time")
-    table.add_column("Voltage", justify="right", style="yellow")
-    table.add_column("Current", justify="right", style="cyan")
-    table.add_column("Power", justify="right", style="red")
-    table.add_column("Temp", justify="right")
-    table.add_column("Status", style="dim")
 
     def on_measurement(m):
         nonlocal csv_writer
-        
-        # 1. Save to CSV
         if csv_handler:
             if not csv_writer:
                 csv_writer = csv.DictWriter(csv_handler, fieldnames=m.to_dict().keys())
@@ -48,38 +33,18 @@ def run(
             csv_writer.writerow(m.to_dict())
             csv_handler.flush()
 
-        # 2. Output to Console (if not quiet)
         if not quiet:
             if verbose:
-                # Detailed log style
                 console.log(f"V:{m.voltage:<5.2f} A:{m.current:<5.2f} W:{m.power:<5.2f} T:{m.temperature} [{m.duration}]")
             else:
-                # Live single-row update (Clean & Simple)
-                # We reuse the same table object but clear rows to simulate a static header
-                # Actually, standard print is better for simple logging, 
-                # but Live Table looks nicer if we want a static status bar.
-                # Let's just do a clean one-line print that overwrites itself using carriage return,
-                # or just standard logging. 
-                # User said "Headless mostly", so standard scrolling log is safer/simpler than TUI.
-                # Let's stick to a clean, formatted print.
-                
-                status_msg = "OK"
+                status_msg = f"OK"
                 if m.voltage < m.lvp or m.current > m.ocp:
                     status_msg = "PROTECTION?"
-
-                # Print clean columns
-                print(f"{m.timestamp.split('T')[1][:8]} | "
-                      f"{m.voltage:5.2f} V | "
-                      f"{m.current:5.2f} A | "
-                      f"{m.power:5.2f} W | "
-                      f"{m.temperature}C | "
-                      f"{status_msg}")
+                print(f"{m.timestamp.split("T")[1][:8]} | {m.voltage:5.2f} V | {m.current:5.2f} A | {m.power:5.2f} W | {m.temperature}C | {status_msg}")
 
     async def main_async():
         client = J7CBLEClient(on_measurement=on_measurement)
-        
         device = None
-        # Simple status spinner during scan
         with console.status("[bold green]Scanning for J7-C/UC96...[/bold green]"):
             try:
                 device = await client.find_device()
@@ -94,9 +59,8 @@ def run(
         console.print(f"[green]Connected to {device.name} ({device.address})[/green]")
         console.print("[dim]Press Ctrl+C to stop logging...[/dim]")
         
-        # Print Header for text output
         if not quiet and not verbose:
-             print(f"{ 'Time':<8} | { 'Volts':<7} | { 'Amps':<7} | { 'Watts':<7} | { 'Temp':<4} | {'Status'}")
+             print(f"{"Time":<8} | {"Volts":<7} | {"Amps":<7} | {"Watts":<7} | {"Temp":<4} | {"Status"}")
              print("-" * 55)
 
         await client.run(device.address)
@@ -108,6 +72,19 @@ def run(
     finally:
         if csv_handler:
             csv_handler.close()
+
+@app.command()
+def web(
+    port: int = typer.Option(8000, help="Web server port"),
+    host: str = typer.Option("0.0.0.0", help="Web server host")
+):
+    """
+    Start Web Dashboard (and background logging).
+    """
+    console.print(f"[green]Starting Web Dashboard at http://{host}:{port}[/green]")
+    console.print("[dim]Background logging active. Press Ctrl+C to stop server.[/dim]")
+    
+    uvicorn.run("j7_c_logger.web.server:app", host=host, port=port, reload=False)
 
 if __name__ == "__main__":
     app()

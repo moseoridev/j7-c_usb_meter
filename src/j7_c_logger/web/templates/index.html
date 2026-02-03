@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>J7-C USB Tester</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #f3f4f6;
+            --text-color: #1f2937;
+            --card-bg: #ffffff;
+            --border-color: #e5e7eb;
+            --accent: #6366f1;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-color: #100c2a;
+                --text-color: #f3f4f6;
+                --card-bg: #1e1b4b;
+                --border-color: #312e81;
+                --accent: #818cf8;
+            }
+        }
+
+        body { margin: 0; padding: 0; background-color: var(--bg-color); color: var(--text-color); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; transition: background-color 0.3s; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        
+        /* Header */
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid var(--border-color); }
+        .header h1 { margin: 0; font-size: 1.5rem; }
+        .status-badge { padding: 5px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: bold; background: #9ca3af; color: white; transition: all 0.3s; }
+        .status-badge.connected { background: #10b981; }
+        .status-badge.scanning { background: #f59e0b; animation: pulse 1.5s infinite; }
+        .status-badge.disconnected { background: #ef4444; }
+
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
+
+        /* Metrics Cards */
+        .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .card { background: var(--card-bg); padding: 15px; border-radius: 12px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .card h3 { margin: 0 0 5px 0; font-size: 0.8rem; color: var(--accent); text-transform: uppercase; letter-spacing: 1px; }
+        .card .value { font-size: 1.8rem; font-weight: 700; }
+        .card .unit { font-size: 0.5em; opacity: 0.7; vertical-align: top; margin-left: 2px; }
+
+        /* Chart */
+        #chart-container { width: 100%; height: 50vh; min-height: 400px; background: var(--card-bg); border-radius: 12px; padding: 15px; box-sizing: border-box; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+
+        /* Overlay for scanning */
+        #overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8); z-index: 1000;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            backdrop-filter: blur(5px);
+            transition: opacity 0.5s;
+        }
+        #overlay.hidden { opacity: 0; pointer-events: none; }
+        .loader {
+            border: 4px solid #f3f3f3; border-top: 4px solid var(--accent); border-radius: 50%;
+            width: 50px; height: 50px; animation: spin 1s linear infinite; margin-bottom: 20px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .overlay-msg { font-size: 1.2rem; color: white; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <!-- Fullscreen Overlay for Scanning -->
+    <div id="overlay">
+        <div class="loader"></div>
+        <div class="overlay-msg" id="overlay-text">Connecting to Server...</div>
+    </div>
+
+    <div class="container">
+        <div class="header">
+            <h1>J7-C Monitor</h1>
+            <div id="status-badge" class="status-badge disconnected">Disconnected</div>
+        </div>
+
+        <div class="cards">
+            <div class="card">
+                <h3>Voltage</h3>
+                <div class="value" id="val-v">--<span class="unit">V</span></div>
+            </div>
+            <div class="card">
+                <h3>Current</h3>
+                <div class="value" id="val-a">--<span class="unit">A</span></div>
+            </div>
+            <div class="card">
+                <h3>Power</h3>
+                <div class="value" id="val-w">--<span class="unit">W</span></div>
+            </div>
+            <div class="card">
+                <h3>Temp</h3>
+                <div class="value" id="val-t">--<span class="unit">°C</span></div>
+            </div>
+        </div>
+
+        <div id="chart-container"></div>
+    </div>
+
+    <script>
+        // Theme Detection
+        const isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        
+        // Init Chart
+        const chartDom = document.getElementById('chart-container');
+        const myChart = echarts.init(chartDom, isDarkMode ? 'dark' : undefined);
+        
+        const dataV = [];
+        const dataA = [];
+        const dataW = [];
+        const dataT = [];
+        const dataTime = [];
+        const maxDataPoints = 600; // 10 minutes history
+
+        const option = {
+            backgroundColor: 'transparent',
+            tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
+            legend: { data: ['Voltage', 'Current', 'Power', 'Temp'], textStyle: { color: isDarkMode ? '#ccc' : '#333' } },
+            grid: { left: '3%', right: '3%', bottom: '3%', containLabel: true },
+            xAxis: { type: 'category', boundaryGap: false, data: dataTime },
+            yAxis: [
+                { type: 'value', name: 'V/W', position: 'left', splitLine: { show: false } },
+                { type: 'value', name: 'A', position: 'right', splitLine: { show: false } },
+                { type: 'value', name: '°C', position: 'right', offset: 40, splitLine: { show: false } }
+            ],
+            series: [
+                { name: 'Voltage', type: 'line', smooth: true, yAxisIndex: 0, data: dataV, showSymbol: false, itemStyle: { color: '#fbbf24' } },
+                { name: 'Current', type: 'line', smooth: true, yAxisIndex: 1, data: dataA, showSymbol: false, itemStyle: { color: '#22d3ee' } },
+                { name: 'Power', type: 'line', smooth: true, yAxisIndex: 0, data: dataW, showSymbol: false, itemStyle: { color: '#ef4444' }, lineStyle: { type: 'dashed' } },
+                { name: 'Temp', type: 'line', smooth: true, yAxisIndex: 2, data: dataT, showSymbol: false, itemStyle: { color: '#10b981' }, areaStyle: { opacity: 0.1 } }
+            ]
+        };
+        myChart.setOption(option);
+
+        // WebSocket & State Logic
+        const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+        const wsUrl = `${protocol}://${window.location.host}/ws`;
+        let socket;
+        let lastPacketTime = 0;
+
+        // UI Elements
+        const overlay = document.getElementById('overlay');
+        const overlayText = document.getElementById('overlay-text');
+        const statusBadge = document.getElementById('status-badge');
+
+        function updateStatus(state, msg) {
+            statusBadge.className = `status-badge ${state}`;
+            statusBadge.innerText = msg;
+            
+            if (state === 'connected') {
+                overlay.classList.add('hidden');
+            } else {
+                overlay.classList.remove('hidden');
+                overlayText.innerText = msg;
+            }
+        }
+
+        function connect() {
+            socket = new WebSocket(wsUrl);
+
+            socket.onopen = () => {
+                updateStatus('scanning', 'Scanning for Device...');
+            };
+
+            socket.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                
+                // If we receive data, we are definitely connected to device
+                updateStatus('connected', 'Live Logging');
+                lastPacketTime = Date.now();
+
+                // Update Cards
+                document.getElementById('val-v').innerHTML = `${data.voltage.toFixed(2)}<span class="unit">V</span>`;
+                document.getElementById('val-a').innerHTML = `${data.current.toFixed(2)}<span class="unit">A</span>`;
+                document.getElementById('val-w').innerHTML = `${data.power.toFixed(2)}<span class="unit">W</span>`;
+                document.getElementById('val-t').innerHTML = `${data.temperature}<span class="unit">°C</span>`;
+
+                // Update Chart
+                const now = new Date().toLocaleTimeString();
+                dataTime.push(now);
+                dataV.push(data.voltage);
+                dataA.push(data.current);
+                dataW.push(data.power);
+                dataT.push(data.temperature);
+
+                if (dataTime.length > maxDataPoints) {
+                    dataTime.shift(); dataV.shift(); dataA.shift(); dataW.shift(); dataT.shift();
+                }
+
+                myChart.setOption({
+                    xAxis: { data: dataTime },
+                    series: [ { data: dataV }, { data: dataA }, { data: dataW }, { data: dataT } ]
+                });
+            };
+
+            socket.onclose = () => {
+                updateStatus('disconnected', 'Server Disconnected. Reconnecting...');
+                setTimeout(connect, 3000);
+            };
+        }
+
+        connect();
+        window.addEventListener('resize', myChart.resize);
+        
+        // Watchdog: If no data for 5 seconds, show scanning
+        setInterval(() => {
+            if (Date.now() - lastPacketTime > 5000 && socket.readyState === WebSocket.OPEN) {
+                updateStatus('scanning', 'Searching for Device...');
+            }
+        }, 2000);
+
+    </script>
+</body>
+</html>
