@@ -2,8 +2,13 @@ import typer
 import asyncio
 import csv
 import uvicorn
+import logging
 from rich.console import Console
 from .core.client import J7CBLEClient
+
+# Configure logging to show up in Rich console nicely if needed, 
+# but for CLI mode we control output manually.
+logging.basicConfig(level=logging.ERROR)
 
 app = typer.Typer(help="J7-C USB Tester Logger & Web Dashboard")
 console = Console()
@@ -16,12 +21,13 @@ def run(
 ):
     """
     Start data collection (CLI Mode).
+    Automatically reconnects if device is lost.
     """
     csv_handler = None
     csv_writer = None
 
     if csv_file:
-        f = open(csv_file, "w", newline="")
+        f = open(csv_file, 'w', newline='')
         csv_handler = f
 
     def on_measurement(m):
@@ -40,35 +46,47 @@ def run(
                 status_msg = f"OK"
                 if m.voltage < m.lvp or m.current > m.ocp:
                     status_msg = "PROTECTION?"
-                print(f"{m.timestamp.split("T")[1][:8]} | {m.voltage:5.2f} V | {m.current:5.2f} A | {m.power:5.2f} W | {m.temperature}C | {status_msg}")
+                # Overwrite line implementation could be added, but simple scroll is safer for logging
+                print(f"{m.timestamp.split('T')[1][:8]} | {m.voltage:5.2f} V | {m.current:5.2f} A | {m.power:5.2f} W | {m.temperature}C | {status_msg}")
 
     async def main_async():
         client = J7CBLEClient(on_measurement=on_measurement)
-        device = None
-        with console.status("[bold green]Scanning for J7-C/UC96...[/bold green]"):
-            try:
-                device = await client.find_device()
-            except Exception as e:
-                console.print(f"[red]Scan failed: {e}[/red]")
-                return
-
-        if not device:
-            console.print("[red]Device not found.[/red]")
-            return
-
-        console.print(f"[green]Connected to {device.name} ({device.address})[/green]")
-        console.print("[dim]Press Ctrl+C to stop logging...[/dim]")
         
-        if not quiet and not verbose:
-             print(f"{"Time":<8} | {"Volts":<7} | {"Amps":<7} | {"Watts":<7} | {"Temp":<4} | {"Status"}")
-             print("-" * 55)
+        # Infinite Retry Loop
+        while True:
+            device = None
+            if not quiet:
+                with console.status("[bold green]Scanning for J7-C/UC96...[/bold green]"):
+                    device = await client.find_device()
+            else:
+                device = await client.find_device()
 
-        await client.run(device.address)
+            if not device:
+                if not quiet:
+                    console.print("[red]Device not found. Retrying in 5s...[/red]")
+                await asyncio.sleep(5)
+                continue
+
+            if not quiet:
+                console.print(f"[green]Connected to {device.name} ({device.address})[/green]")
+                console.print("[dim]Press Ctrl+C to stop logging...[/dim]")
+                if not verbose:
+                    print(f"{ 'Time':<8} | {'Volts':<7} | {'Amps':<7} | {'Watts':<7} | {'Temp':<4} | {'Status'}")
+                    print("-" * 55)
+
+            try:
+                await client.run(device.address)
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:
+                if not quiet:
+                    console.print(f"[red]Connection Lost: {e}. Reconnecting...[/red]")
+                await asyncio.sleep(2)
 
     try:
         asyncio.run(main_async())
     except KeyboardInterrupt:
-        console.print("\n[yellow]Stopped.[/yellow]")
+        console.print("\n[yellow]Stopped by user.[/yellow]")
     finally:
         if csv_handler:
             csv_handler.close()
@@ -84,6 +102,7 @@ def web(
     console.print(f"[green]Starting Web Dashboard at http://{host}:{port}[/green]")
     console.print("[dim]Background logging active. Press Ctrl+C to stop server.[/dim]")
     
+    # Run Uvicorn Programmatically
     uvicorn.run("j7_c_logger.web.server:app", host=host, port=port, reload=False)
 
 if __name__ == "__main__":
