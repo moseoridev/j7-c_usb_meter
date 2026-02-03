@@ -8,14 +8,13 @@ from contextlib import asynccontextmanager
 from collections import deque
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, FileResponse
 
 from j7_c_logger.core.client import J7CBLEClient
 from j7_c_logger.core.protocol import Measurement
 
 # Global State
 latest_data: Measurement | None = None
-# Store last 3600 points (approx 1 hour) for chart restoration
 history_buffer: deque = deque(maxlen=3600)
 connection_status: str = "Initializing..."
 connected_clients: list[WebSocket] = []
@@ -38,7 +37,6 @@ async def broadcast_status(msg: str):
         if c in connected_clients: connected_clients.remove(c)
 
 async def broadcast_data(m: Measurement):
-    # Only broadcast 'live' updates (single point)
     payload = json.dumps({"type": "data", "data": m.to_dict()})
     to_remove = []
     for client in connected_clients:
@@ -54,6 +52,9 @@ async def ble_worker():
     csv_file = None
     csv_writer = None
     
+    # Ensure directory exists
+    Path(CSV_LOG_PATH).parent.mkdir(parents=True, exist_ok=True)
+    
     try:
         csv_file = open(CSV_LOG_PATH, 'w', newline='')
     except Exception as e:
@@ -62,9 +63,8 @@ async def ble_worker():
     def on_measurement(m: Measurement):
         global latest_data
         latest_data = m
-        history_buffer.append(m.to_dict()) # Save to RAM
+        history_buffer.append(m.to_dict()) 
         
-        # Save to Disk
         nonlocal csv_writer
         if csv_file:
             try:
@@ -120,15 +120,19 @@ async def get():
     html_path = Path(__file__).parent / "templates" / "index.html"
     return HTMLResponse(html_path.read_text())
 
+@app.get("/download")
+async def download_csv():
+    """Download the current log file."""
+    if Path(CSV_LOG_PATH).exists():
+        return FileResponse(CSV_LOG_PATH, filename=Path(CSV_LOG_PATH).name, media_type='text/csv')
+    return {"error": "Log file not found"}
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     connected_clients.append(websocket)
     
-    # 1. Send Status
     await websocket.send_text(json.dumps({"type": "status", "msg": connection_status}))
-    
-    # 2. Send History (Bulk) for Chart Restoration
     if history_buffer:
         await websocket.send_text(json.dumps({"type": "history", "data": list(history_buffer)}))
     

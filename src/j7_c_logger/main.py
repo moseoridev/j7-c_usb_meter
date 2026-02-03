@@ -4,6 +4,8 @@ import csv
 import uvicorn
 import logging
 import os
+from datetime import datetime
+from pathlib import Path
 from rich.console import Console
 from .core.client import J7CBLEClient
 
@@ -13,22 +15,35 @@ logging.basicConfig(level=logging.ERROR)
 app = typer.Typer(help="J7-C USB Tester Logger & Web Dashboard")
 console = Console()
 
+def get_default_csv_name():
+    # Ensure logs dir exists
+    Path("logs").mkdir(exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    return f"logs/j7c_{timestamp}.csv"
+
 @app.command()
 def run(
-    csv_file: str = typer.Option(None, "--csv", help="Path to save CSV data"),
+    csv_file: str = typer.Option(None, "--csv", help="Path to save CSV data. Defaults to logs/j7c_YYYYMMDD_HHMMSS.csv"),
     quiet: bool = typer.Option(False, "--quiet", help="Run in background with minimal output"),
     verbose: bool = typer.Option(False, "--verbose", help="Show detailed log output")
 ):
     """
     Start data collection (CLI Mode).
-    Automatically reconnects if device is lost.
     """
+    # Auto-generate filename if not provided
+    if not csv_file:
+        csv_file = get_default_csv_name()
+    
     csv_handler = None
     csv_writer = None
 
-    if csv_file:
+    try:
         f = open(csv_file, 'w', newline='')
         csv_handler = f
+        console.print(f"[green]Logging to: {csv_file}[/green]")
+    except Exception as e:
+        console.print(f"[red]Failed to open CSV: {e}[/red]")
+        return
 
     def on_measurement(m):
         nonlocal csv_writer
@@ -91,15 +106,19 @@ def run(
 
 @app.command()
 def web(
-    csv_file: str = typer.Option("web_log.csv", "--csv", help="Path to save CSV data"),
+    csv_file: str = typer.Option(None, "--csv", help="Path to save CSV data. Defaults to logs/j7c_YYYYMMDD_HHMMSS.csv"),
     port: int = typer.Option(8000, help="Web server port"),
     host: str = typer.Option("0.0.0.0", help="Web server host")
 ):
     """
     Start Web Dashboard (and background logging).
     """
+    # Auto-generate filename if not provided
+    if not csv_file:
+        csv_file = get_default_csv_name()
+
     console.print(f"[green]Starting Web Dashboard at http://{host}:{port}[/green]")
-    console.print(f"[dim]Logging to: {csv_file}[/dim]")
+    console.print(f"[bold cyan]Logging to: {csv_file}[/bold cyan]")
     console.print("[dim]Background logging active. Press Ctrl+C to stop server.[/dim]")
     
     # Pass CSV path via environment variable to the worker
