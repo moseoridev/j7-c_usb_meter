@@ -1,4 +1,6 @@
-# J7-C USB Tester Logger
+# J7-C USB Tester Logger (Modernized)
+
+> **Note**: This repository is a modernized fork of the original J7-C USB Tester script. It has been completely refactored to support **Headless BLE logging** and a **Real-time Web Dashboard** using a modern Python stack (`FastAPI`, `Bleak`, `Typer`, `Rich`).
 
 A modern, headless data logger and web dashboard for the **J7-C / UC96** USB Tester via Bluetooth Low Energy (BLE).
 
@@ -53,4 +55,4 @@ uv run j7-c-usb-tester run
 
 ## License
 
-MIT
+See [LICENSE.txt](LICENSE.txt).
