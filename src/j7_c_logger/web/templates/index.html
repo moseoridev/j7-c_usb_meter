@@ -98,7 +98,7 @@
             myChart.setOption({
                 backgroundColor: 'transparent',
                 tooltip: { trigger: 'axis', axisPointer: { type: 'cross' }, backgroundColor: colors.tooltipBg, textStyle: { color: colors.tooltipText } },
-                legend: { data: ['Voltage', 'Current', 'Power', 'Temp'], textStyle: { color: colors.text } },
+                legend: { top: 'top', data: ['Voltage', 'Current', 'Power', 'Temp'], textStyle: { color: colors.text } },
                 grid: { left: '2%', right: '2%', bottom: '2%', top: '15%', containLabel: true },
                 xAxis: { type: 'category', boundaryGap: false, data: data.time, axisLabel: { color: colors.text } },
                 yAxis: [
