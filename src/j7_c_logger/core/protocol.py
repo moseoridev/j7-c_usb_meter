@@ -53,11 +53,11 @@ def parse_packet(data: bytes) -> Measurement:
     wh = struct.unpack('>I', data[14:18])[0]/100
     
     # USB Data lines
-    d_plus = struct.unpack('>H', data[18:20])[0]/100
-    d_minus = struct.unpack('>H', data[20:22])[0]/100
+    d_plus = struct.unpack('<H', data[18:20])[0]/100
+    d_minus = struct.unpack('<H', data[20:22])[0]/100
     
     # Environmental
-    temp = struct.unpack('>H', data[22:24])[0]
+    temp = struct.unpack('<H', data[22:24])[0]
     duration = _get_duration(data[24:28])
 
     # Protection Settings
